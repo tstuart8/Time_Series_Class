@@ -1,0 +1,138 @@
+\documentclass[12pt]{article}
+\usepackage{listings}
+\usepackage{inconsolata}
+\usepackage{amsmath}
+\usepackage{mathtools}
+\usepackage{multirow}
+\usepackage[margin=0.5in]{geometry}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{qtree}
+
+\lstset{breaklines=true,showstringspaces=false}
+<<setup, include=FALSE, cache=FALSE>>=
+opts_chunk$set(fig.path = 'figure/listings0*')
+options(replace.assign = TRUE, width=60)
+options(warn=-1)
+render_listings()
+library(astsa)
+setwd("~/School/Fall 2018/STAA 573/Assignment 2")
+@
+
+\title{Homework 2\\ STAA 573}
+\author{Taylor Stuart}
+
+
+\begin{document}
+
+\maketitle
+
+Problems 2.2, 3.9, 3.10, 3.33
+
+\begin{enumerate}
+
+\item[2.2]
+
+\begin{enumerate}
+
+\item
+<<>>=
+n =length(tempr)
+temp = tempr -mean(tempr)# center temperature
+temp2 = temp^2
+trend =time(cmort)# time
+fit1 =lm(cmort~ trend + temp + temp2 + part, na.action=NULL)
+fit2 =lm(cmort[5:n]~ trend[5:n] + temp[5:n] + temp2[5:n] + part[5:n]+ part[1:(n-4)], na.action=NULL)
+summary(fit2)
+@
+The summary shows that all the coefficients are significant and thus we have the following model \\
+$M_t = \beta_0 + \beta_1 t + \beta_2 (T_t - T_.) + \beta_3 (T_t - T_.)^2 + \beta_4 P_t + \beta_5 P_{t-4} + w_t$ \\
+The last coefficient captures the relationship between the current particulate count and the count 4 weeks (1 month) prior.
+
+\item
+<<fig.height=6, fig.width=6>>=
+pairs(cbind(Mortality=cmort[5:n], Temperature=tempr[5:n], Particulates=part[5:n], PT4=part[1:(n-4)]))
+
+round(cor(cbind(Mortality=cmort[5:n], Temperature=tempr[5:n], Particulates=part[5:n], PT4=part[1:(n-4)])), 2)
+@
+The above pairwise correlation matrix shows that the correlation between $M_t$ and $P_t$ is not as strong as $M_t$ and $P_{t-4}$. It can also be observed visually in the scatterplot matrix. The association between Mortality and PT4 is a stronger linear relationship than that of Mortality and Particulates.
+
+\end{enumerate}
+
+\item[3.9]
+
+<<fig.height=5, fig.width=7>>=
+AR<-arima.sim(list(order=c(1,0,0),ar=0.6),n=100)
+MA<-arima.sim(list(order=c(0,0,1),ma=.9),n=100)
+ARMA<-arima.sim(list(order=c(1,0,1),ar=.6,ma=.9),n=100)
+par(mfcol=c(1,2))
+acf(AR)
+pacf(AR)
+par(mfcol=c(1,2))
+acf(MA)
+pacf(MA)
+par(mfcol=c(1,2))
+acf(ARMA)
+pacf(ARMA)
+@
+\\ The comparisons are shown above. We expect ACF for AR and ARMA and PACF for MA to tail off while PACF for AR and ARMA and ACF for MA to cut off after lag 1. We generally observe this behavior but it is more noticeable with a larger n.
+
+\item[3.10]
+
+\begin{enumerate}
+
+\item
+<<>>=
+(regr = ar.ols(cmort, order=2, demean=F, intercept=TRUE))  # regression
+
+@
+
+\item
+<<fig.height=5, fig.width=5>>=
+par(mfcol=c(1,1))
+fore = predict(regr, n.ahead=4)
+ts.plot(cmort, fore$pred, col=1:2,  xlim=c(1979.5,1980), ylab="Mortality", main="Predicted Mortality: 4 Weeks")
+lines(fore$pred, type="l", col=2)
+lines(fore$pred+fore$se, lty="dashed", col=4)
+lines(fore$pred-fore$se, lty="dashed", col=4)
+@
+
+\end{enumerate}
+
+\item[3.33]
+<<fig.height=5, fig.width=5>>=
+plot.ts(gtemp)
+
+acf(gtemp)
+@
+\\The clear positive trend indicates we should take a difference
+
+<<fig.height=5, fig.width=5>>=
+gtemp_d <- diff(gtemp)
+plot.ts(gtemp_d)
+@
+\\ Now we look at ACF and PACF to see if we observe trends similar to data from table in problem 3.9.
+
+<<fig.height=5, fig.width=7>>=
+par(mfrow = c(1,2))
+acf(gtemp_d)
+pacf(gtemp_d)
+@
+\\ The ACF cuts off at lag 2 while the PACF tails off. This means we use a MA(2) for the differenced temp as suggested in the table. Below is the model fit
+
+<<>>=
+par(mfrow = c(1,1))
+temp.fit <- sarima(gtemp, 0, 1, 2, details = TRUE)
+@
+\\ The residuals don't appear to have pattern and the ACF appears to resemble the ACF of white noise. The qqplot also indiciates normality.
+
+I will now do the forecast
+
+<<fig.height=6, fig.width=6>>=
+sarima.for(gtemp, n.ahead=10, 0, 1, 2)
+@
+The forecast indicates consistent growth over the next ten years which aligns with the growth seen over the entire dataset. The confidence bands around the forecast capture the variation we see in the past years as well.
+
+\end{enumerate}
+
+\end{document}
